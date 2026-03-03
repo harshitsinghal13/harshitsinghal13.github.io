@@ -1,390 +1,359 @@
 ﻿<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Operational Lessons from Benchmarking Real-Time Push Protocols Under CPU Limits</title>
-    <meta name="description" content="Production lessons from benchmarking SSE and WebSocket under CPU limits, with focus on event loop behavior, memory stability, Kubernetes constraints, and latency-tail SLOs." />
-    <meta name="author" content="Harshit Singhal" />
-    <meta name="robots" content="index,follow" />
-    <meta property="og:type" content="article" />
-    <meta property="og:title" content="Operational Lessons from Benchmarking Real-Time Push Protocols Under CPU Limits" />
-    <meta property="og:description" content="Staff-level guidance on push protocol behavior under container pressure, with monitoring and decision criteria for production systems." />
-    <meta property="og:url" content="https://harshitsinghal13.github.io/blogs/benchmarking-lessons.html" />
-    <meta property="og:site_name" content="Harshit Singhal" />
-    <link rel="canonical" href="https://harshitsinghal13.github.io/blogs/benchmarking-lessons.html" />
-    <style>
-      :root {
-        --bg: #0a0f17;
-        --panel: #101826;
-        --panel-2: #131f31;
-        --text: #e7edf7;
-        --muted: #9fb0c7;
-        --line: #223247;
-        --accent: #f4a261;
-        --code: #0b1320;
-      }
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>SSE vs WebSocket Under CPU Limits: What Actually Breaks First in Production</title>
+  <meta name="description" content="A production-focused analysis of what fails first under CPU limits in SSE and WebSocket systems, with emphasis on tail latency, backpressure, and saturation behavior."/>
+  <meta name="author" content="Harshit Singhal"/>
+  <meta name="robots" content="index,follow"/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:title" content="SSE vs WebSocket Under CPU Limits: What Actually Breaks First in Production"/>
+  <meta property="og:description" content="A production-focused analysis of what fails first under CPU limits in SSE and WebSocket systems."/>
+  <meta property="og:url" content="https://harshitsinghal13.github.io/blogs/benchmarking-lessons.html"/>
+  <link rel="canonical" href="https://harshitsinghal13.github.io/blogs/benchmarking-lessons.html"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <style>
+:root{
+  --bg:#080d14;--bg-mid:#0c1320;--panel:#0f1a2c;--panel-2:#132035;
+  --glass:rgba(15,26,44,0.72);--line:#1e3050;--line-dim:#162540;
+  --text:#dce7f5;--text-dim:#8faac4;--text-faint:#506070;
+  --amber:#f4a261;--amber-dim:rgba(244,162,97,0.12);
+  --green:#4ecf8a;--red:#f07070;--blue:#60a8f0;--code-bg:#060c15;
+  --serif:'Fraunces',Georgia,serif;--mono:'DM Mono','SF Mono',monospace;
+  --sans:'DM Sans',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:var(--sans);font-weight:300;
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 80% -10%,rgba(244,162,97,.10) 0%,transparent 60%),
+    radial-gradient(ellipse 600px 400px at 10% 80%,rgba(96,168,240,.05) 0%,transparent 55%),
+    linear-gradient(180deg,#080d14 0%,#090e17 100%);
+  color:var(--text);line-height:1.72;-webkit-font-smoothing:antialiased;min-height:100vh}
+#progress{position:fixed;top:0;left:0;height:2px;width:0%;
+  background:linear-gradient(90deg,var(--amber),rgba(244,162,97,.4));z-index:100;transition:width .1s linear}
+.container{max-width:860px;margin:0 auto;padding:36px 24px 80px}
+.hero{background:linear-gradient(160deg,rgba(19,32,53,.80) 0%,rgba(12,19,32,.60) 100%);
+  border:1px solid var(--line);border-radius:14px;padding:36px 40px 32px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60px;right:-80px;width:320px;height:320px;
+  background:radial-gradient(circle,rgba(244,162,97,.07) 0%,transparent 70%);pointer-events:none}
+.eyebrow{font-family:var(--mono);font-size:.68rem;font-weight:400;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:14px}
+h1{font-family:var(--serif);font-size:clamp(1.75rem,3.8vw,2.5rem);font-weight:400;
+  line-height:1.2;letter-spacing:-.02em;color:#eef4ff;margin-bottom:16px}
+.subtitle{font-size:1rem;color:var(--text-dim);max-width:68ch;line-height:1.65;margin-bottom:20px}
+.meta{display:flex;align-items:center;gap:18px;font-family:var(--mono);font-size:.72rem;
+  color:var(--text-faint);padding-top:18px;border-top:1px solid var(--line-dim)}
+.meta-dot{color:var(--line)}
+.nav-back{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.7rem;
+  color:var(--text-faint);text-decoration:none;letter-spacing:.06em;margin-bottom:24px;transition:color .2s}
+.nav-back:hover{color:var(--amber)}
+.nav-back::before{content:'← '}
+article{margin-top:20px;background:rgba(12,19,32,.55);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.toc{background:var(--panel-2);border-bottom:1px solid var(--line);padding:20px 32px}
+.toc-label{font-family:var(--mono);font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--text-faint);margin-bottom:12px}
+.toc-list{list-style:none;display:flex;flex-wrap:wrap;gap:6px 4px}
+.toc-list li a{font-family:var(--mono);font-size:.7rem;color:var(--text-dim);text-decoration:none;
+  background:rgba(30,48,80,.5);border:1px solid var(--line);padding:3px 10px;border-radius:4px;
+  transition:color .2s,border-color .2s;white-space:nowrap}
+.toc-list li a:hover{color:var(--amber);border-color:var(--amber)}
+.section{padding:32px 40px;border-bottom:1px solid var(--line-dim)}
+.section:last-child{border-bottom:none}
+h2{font-family:var(--serif);font-size:1.3rem;font-weight:400;color:#eef4ff;
+  line-height:1.3;margin-bottom:16px;letter-spacing:-.01em}
+.section-num{font-family:var(--mono);font-size:.65rem;color:var(--amber);
+  letter-spacing:.1em;margin-bottom:6px;display:block}
+p{font-size:.975rem;color:#c8d8ec;margin-bottom:14px;line-height:1.75}
+p:last-child{margin-bottom:0}
+strong{color:var(--text);font-weight:500}
+ul,ol{padding-left:0;margin-bottom:14px;list-style:none}
+li{font-size:.975rem;color:#c8d8ec;line-height:1.7;margin-bottom:8px;
+  padding-left:18px;position:relative}
+li::before{content:'–';position:absolute;left:0;color:var(--amber);font-family:var(--mono)}
+.note{border-left:2px solid var(--amber);padding:14px 18px;
+  background:var(--amber-dim);border-radius:0 8px 8px 0;margin:18px 0}
+.note p{font-size:.9rem;color:rgba(244,200,150,.9);margin:0;line-height:1.6}
+.note-label{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.phase-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}
+.phase-card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+.phase-card-num{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text-faint);margin-bottom:6px}
+.phase-card-title{font-size:.82rem;font-weight:500;color:var(--text);margin-bottom:4px;line-height:1.3}
+.phase-card-desc{font-size:.78rem;color:var(--text-dim);line-height:1.5}
+.phase-card.p1{border-top:2px solid var(--green)}
+.phase-card.p2{border-top:2px solid var(--amber)}
+.phase-card.p3{border-top:2px solid var(--red)}
+.table-wrap{overflow-x:auto;margin:18px 0;border-radius:10px;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+thead tr{background:var(--panel-2);border-bottom:1px solid var(--line)}
+th{padding:12px 16px;text-align:left;font-family:var(--mono);font-size:.65rem;
+  letter-spacing:.1em;text-transform:uppercase;font-weight:400;color:var(--text-dim);white-space:nowrap}
+td{padding:13px 16px;border-bottom:1px solid var(--line-dim);vertical-align:top;
+  color:#c8d8ec;line-height:1.55}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:rgba(30,48,80,.3)}
+td:first-child{color:var(--text);font-weight:400}
+td strong{color:var(--amber);font-weight:400}
+.monitor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}
+.monitor-card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.monitor-label{font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.monitor-items{list-style:none;padding:0;margin:0}
+.monitor-items li{font-size:.82rem;color:var(--text-dim);padding-left:0;
+  margin-bottom:4px;line-height:1.5}
+.monitor-items li::before{display:none}
+.code-wrap{margin:18px 0;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.code-header{background:var(--panel-2);border-bottom:1px solid var(--line);padding:8px 16px;
+  display:flex;align-items:center;justify-content:space-between}
+.code-lang{font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text-faint)}
+.code-dots{display:flex;gap:5px}
+.code-dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
+pre{margin:0;padding:20px 22px;overflow-x:auto;background:var(--code-bg)}
+code,pre{font-family:var(--mono);font-size:.845rem;line-height:1.7}
+pre code{color:#b8cce0}
+.ck{color:#7ec8a0}.cf{color:#79b8e0}.cs{color:#e0c080}
+.cc{color:#4a5e70;font-style:italic}.cn{color:#e0a080}.cca{color:var(--amber)}
+.page-footer{margin-top:24px;display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:10px}
+.page-footer a{font-family:var(--mono);font-size:.7rem;color:var(--text-faint);
+  text-decoration:none;letter-spacing:.06em;transition:color .2s}
+.page-footer a:hover{color:var(--amber)}
+.page-footer-right{font-family:var(--mono);font-size:.68rem;color:var(--text-faint)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.hero{animation:fadeUp .5s ease both}
+article{animation:fadeUp .5s .1s ease both}
+@media(max-width:660px){
+  .hero,.section{padding-left:20px;padding-right:20px}
+  .toc{padding-left:20px;padding-right:20px}
+  .phase-row,.monitor-grid{grid-template-columns:1fr}
+  th,td{padding:10px 12px}
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<main class="container">
+  <a class="nav-back" href="../index.html">Home</a>
+  <header class="hero">
+    <p class="eyebrow">Backend &amp; Platform Engineering</p>
+    <h1>SSE vs WebSocket Under CPU Limits:<br>What Actually Breaks First in Production</h1>
+    <p class="subtitle">Protocol choices look equivalent in happy-path tests. Under cgroup pressure, event-loop contention, queue growth, and reconnection dynamics separate resilient designs from fragile ones.</p>
+    <div class="meta">
+      <span>Harshit Singhal</span><span class="meta-dot">&middot;</span>
+      <span>March 2026</span><span class="meta-dot">&middot;</span>
+      <span>10 min read</span>
+    </div>
+  </header>
+  <article>
+    <div class="toc">
+      <div class="toc-label">Contents</div>
+      <ol class="toc-list">
+        <li><a href="#s1">Executive Framing</a></li>
+        <li><a href="#s2">Setup Characteristics</a></li>
+        <li><a href="#s3">Runtime &amp; Failure Mechanics</a></li>
+        <li><a href="#s4">Resource Cost Analysis</a></li>
+        <li><a href="#s5">Behavior Under Scale</a></li>
+        <li><a href="#s6">Operational Risks</a></li>
+        <li><a href="#s7">Decision Matrix</a></li>
+        <li><a href="#s8">Monitoring &amp; SLO</a></li>
+        <li><a href="#s9">Code Pattern</a></li>
+        <li><a href="#s10">Conclusion</a></li>
+      </ol>
+    </div>
 
-      * {
-        box-sizing: border-box;
-      }
+    <div class="section" id="s1">
+      <span class="section-num">01</span>
+      <h2>Executive Framing</h2>
+      <p>Most push benchmarks fail before the system fails: they optimize for throughput charts and miss failure mechanics. In production, the decisive signal is not how fast the service can publish at steady state, but how it degrades when scheduling contention, queue amplification, and reconnect pressure hit at the same time.</p>
+      <p>These conclusions are drawn from controlled experimental runs under CPU-capped container deployments with consistent workload generation. The focus here is on behavioral patterns under saturation rather than absolute throughput numbers.</p>
+      <div class="note">
+        <div class="note-label">Key insight</div>
+        <p>The most costly mistake is optimizing for maximum throughput while ignoring p95 and p99 delivery behavior during throttling and reconnect storms.</p>
+      </div>
+    </div>
 
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
+    <div class="section" id="s2">
+      <span class="section-num">02</span>
+      <h2>Experimental Setup Characteristics</h2>
+      <ul>
+        <li><strong>Constrained CPU limits:</strong> deliberate cgroup throttling to force scheduler contention.</li>
+        <li><strong>Controlled load phases:</strong> both steady-state and burst scenarios exercised under identical control settings.</li>
+        <li><strong>Primary observability lens:</strong> latency distribution, queue depth evolution, and reconnect behavior under pressure.</li>
+        <li><strong>Explicit objective:</strong> observe failure mechanics under saturation, not compare protocol feature sets.</li>
+      </ul>
+    </div>
 
-      body {
-        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background:
-          radial-gradient(1000px 520px at 85% -25%, rgba(244, 162, 97, 0.14), transparent 65%),
-          linear-gradient(180deg, #0a0f17 0%, #0b1220 100%);
-        color: var(--text);
-        line-height: 1.65;
-      }
+    <div class="section" id="s3">
+      <span class="section-num">03</span>
+      <h2>Runtime Architecture and Failure Mechanics</h2>
+      <p>In async Python services, push delivery is bounded by event-loop scheduling fairness and per-connection write-backpressure. Under CPU throttling, cooperative tasks lose cadence; heartbeat handlers, flush loops, and reconnect logic contend for loop time and widen tail latency.</p>
+      <p>Directionally, SSE tended to expose saturation earlier through visible queue pressure and flush jitter, while WebSocket paths were more prone to state-heavy contention once connection management and keepalive work accumulated. The operational result is a different failure shape: SSE usually bends with increasing latency, while WebSocket is more likely to step into abrupt instability if backpressure discipline is weak.</p>
+      <ul>
+        <li><strong>Connection lifecycle:</strong> setup, steady-state writes, slow-consumer detection, and teardown must remain explicit.</li>
+        <li><strong>Event-loop behavior:</strong> small scheduler slips compound into p99 expansion when large connection sets share one loop.</li>
+        <li><strong>Memory model:</strong> bounded queues cap resident memory; unbounded buffering converts transient bursts into sustained instability.</li>
+      </ul>
+      <p>These effects are directional and repeatable across stacks, even when absolute numbers differ by runtime or host profile.</p>
+    </div>
 
-      .container {
-        max-width: 920px;
-        margin: 0 auto;
-        padding: 28px 20px 64px;
-      }
+    <div class="section" id="s4">
+      <span class="section-num">04</span>
+      <h2>Resource Cost Analysis: CPU, Memory, Connection State</h2>
+      <p>CPU and memory costs are tightly coupled through backpressure pathways. As CPU availability tightens, drain rate falls. If ingress remains unchanged, queue depth amplifies, memory pressure rises, allocator overhead increases, and tail latency degrades in a feedback loop.</p>
+      <ul>
+        <li><strong>CPU-bound phase:</strong> serialization and network write scheduling dominate.</li>
+        <li><strong>Memory-bound phase:</strong> buffered messages and per-connection state dominate.</li>
+        <li><strong>State overhead:</strong> protocols with heavier lifecycle bookkeeping amplify both costs at high connection counts.</li>
+      </ul>
+      <p>In containerized environments, this transition can happen quickly because cgroup limits make backlog growth visible as OOM risk instead of a slow degradation.</p>
+    </div>
 
-      .hero {
-        background: linear-gradient(180deg, rgba(19, 31, 49, 0.72), rgba(16, 24, 38, 0.42));
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 26px;
-      }
+    <div class="section" id="s5">
+      <span class="section-num">05</span>
+      <h2>Behavior Under Scale</h2>
+      <p>Scale failures are usually phased. Systems pass through three distinct stages before full collapse.</p>
+      <div class="phase-row">
+        <div class="phase-card p1">
+          <div class="phase-card-num">Phase 1</div>
+          <div class="phase-card-title">p95 drift</div>
+          <div class="phase-card-desc">Stable median latency. Tail begins to expand. System looks healthy in dashboards.</div>
+        </div>
+        <div class="phase-card p2">
+          <div class="phase-card-num">Phase 2</div>
+          <div class="phase-card-title">p99 expansion</div>
+          <div class="phase-card-desc">Reconnect churn begins. Write timeouts appear. Median still acceptable.</div>
+        </div>
+        <div class="phase-card p3">
+          <div class="phase-card-num">Phase 3</div>
+          <div class="phase-card-title">Partial collapse</div>
+          <div class="phase-card-desc">Memory instability, write timeouts, selected pod failures. Health checks may still pass.</div>
+        </div>
+      </div>
+      <p>A recurring failure narrative was pods reporting acceptable CPU utilization while p99 delivery latency expanded sharply due to event-loop scheduling contention and queue drain lag. Health checks still passed, but user-visible latency was already outside safe bounds.</p>
+      <div class="note">
+        <div class="note-label">Scaling caveat</div>
+        <p>Autoscaling helps only if metrics expose saturation visibility. Scaling on CPU alone is insufficient for push systems; latency-tail and queue-pressure signals must participate or scaling reacts after degradation is already user-visible.</p>
+      </div>
+    </div>
 
-      .eyebrow {
-        margin: 0;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-size: 0.78rem;
-        font-weight: 600;
-      }
+    <div class="section" id="s6">
+      <span class="section-num">06</span>
+      <h2>Operational Risks and When Not to Use This Approach</h2>
+      <p>A benchmarking strategy centered on one-way push behavior is inappropriate when product requirements are truly duplex and low-latency in both directions.</p>
+      <ul>
+        <li>Do not generalize one-way benchmark conclusions to interactive bidirectional workloads.</li>
+        <li>Do not run protocol tests without reconnection and slow-consumer scenarios.</li>
+        <li>Do not rely on averages; tail-latency and drop behavior must be primary signals.</li>
+        <li>Do not keep queue depth unbounded to preserve nominal throughput during bursts.</li>
+      </ul>
+    </div>
 
-      h1 {
-        margin: 10px 0 10px;
-        line-height: 1.22;
-        font-size: clamp(1.8rem, 4.2vw, 2.45rem);
-      }
+    <div class="section" id="s7">
+      <span class="section-num">07</span>
+      <h2>Decision Matrix</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Production Context</th><th>Primary Risk</th><th>Recommended Bias</th><th>Operational Reason</th></tr></thead>
+          <tbody>
+            <tr><td>One-way event fanout under tight memory limits</td><td>Buffer growth and OOM</td><td><strong>SSE with bounded queues</strong></td><td>Simpler lifecycle and easier memory control</td></tr>
+            <tr><td>Interactive duplex control channel</td><td>Round-trip semantics and protocol mismatch</td><td><strong>WebSocket</strong></td><td>Native bidirectional framing</td></tr>
+            <tr><td>Bursty traffic with strict p99 SLO</td><td>Scheduler jitter and backlog cascades</td><td><strong>Protocol + explicit shedding policy</strong></td><td>Tail protection matters more than peak throughput</td></tr>
+            <tr><td>Kubernetes with aggressive CPU limits</td><td>Throttle-induced latency amplification</td><td><strong>Scale on latency + queue depth</strong></td><td>CPU-only signals miss early degradation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-      .subtitle {
-        margin: 0;
-        color: var(--muted);
-        max-width: 76ch;
-      }
+    <div class="section" id="s8">
+      <span class="section-num">08</span>
+      <h2>Monitoring and SLO Implications</h2>
+      <p>Push workloads need saturation-aware observability with explicit tail-latency guardrails.</p>
+      <div class="monitor-grid">
+        <div class="monitor-card"><div class="monitor-label">Latency</div><ul class="monitor-items"><li>Delivery p50, p95, p99</li><li>Segmented by protocol and pod</li><li>Tracked at client-visible boundary</li></ul></div>
+        <div class="monitor-card"><div class="monitor-label">Backpressure</div><ul class="monitor-items"><li>Queue depth per connection</li><li>Enqueue drops and write timeout rate</li><li>Slow-consumer counts</li></ul></div>
+        <div class="monitor-card"><div class="monitor-label">Connection Health</div><ul class="monitor-items"><li>Active sockets and reconnect rate</li><li>Disconnect reasons</li><li>Handshake failure rate</li></ul></div>
+        <div class="monitor-card"><div class="monitor-label">Container Pressure</div><ul class="monitor-items"><li>Memory working set and OOM events</li><li>CPU throttled time</li><li>Restart loops</li></ul></div>
+      </div>
+      <p>SLO policy should encode degradation behavior as first-class control logic: acceptable drop strategy, max reconnect churn, and escalation triggers when p99 rises with queue amplification.</p>
+    </div>
 
-      .meta {
-        margin-top: 14px;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
+    <div class="section" id="s9">
+      <span class="section-num">09</span>
+      <h2>Minimal Async Pattern for Bounded Delivery Under CPU Pressure</h2>
+      <p>This pattern favors bounded memory and controlled shedding instead of unbounded buffering.</p>
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">Python &middot; FastAPI &middot; SSE</span>
+          <div class="code-dots"><span></span><span></span><span></span></div>
+        </div>
+<pre><code><span class="ck">import</span> asyncio
+<span class="ck">import</span> time
+<span class="ck">from</span> collections <span class="ck">import</span> deque
+<span class="ck">from</span> fastapi <span class="ck">import</span> FastAPI, Request
+<span class="ck">from</span> fastapi.responses <span class="ck">import</span> StreamingResponse
 
-      article {
-        margin-top: 18px;
-        background: rgba(16, 24, 38, 0.56);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 8px 24px 22px;
-      }
+app = <span class="cf">FastAPI</span>()
 
-      section {
-        padding-top: 24px;
-      }
+<span class="ck">class</span> <span class="cca">DeliveryState</span>:
+    <span class="ck">def</span> <span class="cf">__init__</span>(self, max_queue: <span class="cn">int</span> = <span class="cn">512</span>):
+        self.q = asyncio.<span class="cf">Queue</span>(maxsize=max_queue)
+        self.dropped = <span class="cn">0</span>
+        self.delivery_ms = <span class="cf">deque</span>(maxlen=<span class="cn">2048</span>)
 
-      h2 {
-        margin: 0 0 10px;
-        font-size: 1.25rem;
-        line-height: 1.35;
-      }
+state = <span class="cf">DeliveryState</span>()
 
-      p {
-        margin: 0 0 12px;
-        color: #d7e1ef;
-      }
+<span class="ck">async def</span> <span class="cf">publish</span>(event: <span class="cn">str</span>) -&gt; <span class="ck">None</span>:
+    <span class="ck">if</span> state.q.<span class="cf">full</span>():
+        _ = state.q.<span class="cf">get_nowait</span>()  <span class="cc"># Drop oldest to cap memory.</span>
+        state.dropped += <span class="cn">1</span>
+    state.q.<span class="cf">put_nowait</span>((time.<span class="cf">perf_counter</span>(), event))
 
-      ul {
-        margin: 0 0 12px;
-        padding-left: 20px;
-      }
+<span class="ck">async def</span> <span class="cf">stream</span>(request: Request):
+    <span class="ck">while True</span>:
+        <span class="ck">if await</span> request.<span class="cf">is_disconnected</span>():
+            <span class="ck">break</span>
+        ts, event = <span class="ck">await</span> state.q.<span class="cf">get</span>()
+        state.delivery_ms.<span class="cf">append</span>((time.<span class="cf">perf_counter</span>() - ts) * <span class="cn">1000</span>)
+        <span class="ck">yield</span> <span class="cs">f"data: {event}
 
-      li {
-        margin: 6px 0;
-        color: #d7e1ef;
-      }
+"</span>
 
-      .note {
-        border-left: 3px solid var(--accent);
-        padding: 10px 12px;
-        background: rgba(244, 162, 97, 0.1);
-        border-radius: 8px;
-      }
+<span class="cf">@app.get</span>(<span class="cs">"/events"</span>)
+<span class="ck">async def</span> <span class="cf">events</span>(request: Request):
+    <span class="ck">return</span> <span class="cf">StreamingResponse</span>(
+        <span class="cf">stream</span>(request),
+        media_type=<span class="cs">"text/event-stream"</span>
+    )</code></pre>
+      </div>
+    </div>
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 8px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        overflow: hidden;
-      }
+    <div class="section" id="s10">
+      <span class="section-num">10</span>
+      <h2>Engineering Conclusion</h2>
+      <p>Benchmarking under CPU limits is only useful when it exposes failure mechanics: tail-latency expansion, backpressure collapse, and memory instability under reconnect pressure. Systems that look efficient at median latency can still fail operationally once saturation begins.</p>
+      <p>Treat protocol choice as part of runtime control strategy. Prefer architectures that make saturation visible, keep buffers bounded, and recover predictably after pressure drops.</p>
+    </div>
 
-      th,
-      td {
-        text-align: left;
-        padding: 12px;
-        border-bottom: 1px solid var(--line);
-        vertical-align: top;
-      }
-
-      th {
-        background: var(--panel-2);
-        font-weight: 600;
-        color: #e6eefc;
-      }
-
-      tr:last-child td {
-        border-bottom: 0;
-      }
-
-      pre {
-        margin: 10px 0 0;
-        padding: 14px;
-        overflow-x: auto;
-        background: var(--code);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-      }
-
-      code,
-      pre {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-        font-size: 0.9rem;
-      }
-
-      .footer {
-        margin-top: 20px;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-
-      a {
-        color: var(--accent);
-        text-decoration: none;
-      }
-
-      a:hover {
-        text-decoration: underline;
-      }
-
-      @media (max-width: 700px) {
-        .hero,
-        article {
-          padding-left: 16px;
-          padding-right: 16px;
-        }
-
-        th,
-        td {
-          padding: 10px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="container">
-      <header class="hero">
-        <p class="eyebrow">Backend and Platform Engineering</p>
-        <h1>Operational Lessons from Benchmarking Real-Time Push Protocols Under CPU Limits</h1>
-        <p class="subtitle">
-          Protocol choices look equivalent in happy-path tests. Under cgroup pressure, event-loop contention, queue growth, and reconnection dynamics separate resilient designs from fragile ones.
-        </p>
-        <p class="meta">By Harshit Singhal | March 3, 2026</p>
-      </header>
-
-      <article>
-        <section id="executive-framing">
-          <h2>1. Executive Framing</h2>
-          <p>
-            Benchmarking push systems under CPU limits should answer one question: what fails first when concurrency rises and pod headroom disappears? Median latency is usually stable too long to be useful. Tail latency and memory pressure expose instability earlier.
-          </p>
-          <p class="note">
-            The most costly mistake is optimizing for maximum throughput while ignoring p95 and p99 delivery behavior during throttling and reconnect storms.
-          </p>
-        </section>
-
-        <section id="runtime-architecture">
-          <h2>2. Runtime Architecture and Failure Mechanics</h2>
-          <p>
-            In async Python services, push delivery is bounded by event-loop scheduling fairness and per-connection write-backpressure. Under CPU throttling, cooperative tasks lose cadence; heartbeats, flush loops, and reconnection handlers compete for loop time.
-          </p>
-          <ul>
-            <li><strong>Connection lifecycle:</strong> setup, steady-state writes, slow-consumer detection, and teardown must remain explicit.</li>
-            <li><strong>Event-loop behavior:</strong> small scheduling delays accumulate into p99 spikes when thousands of connections share one loop.</li>
-            <li><strong>Memory model:</strong> bounded queues cap resident memory; unbounded buffers turn transient bursts into prolonged instability.</li>
-          </ul>
-          <p>
-            These effects are directional and repeatable across stacks, even when absolute numbers differ by runtime or host profile.
-          </p>
-        </section>
-
-        <section id="resource-cost">
-          <h2>3. Resource Cost Analysis: CPU, Memory, Connection State</h2>
-          <p>
-            CPU and memory costs are coupled through queueing behavior. As CPU availability tightens, drain rate drops. If ingress is unchanged, queue depth grows and memory pressure rises, which then increases GC or allocator overhead and worsens latency.
-          </p>
-          <ul>
-            <li><strong>CPU-bound phase:</strong> serialization and network write scheduling dominate.</li>
-            <li><strong>Memory-bound phase:</strong> buffered messages and per-connection state dominate.</li>
-            <li><strong>State overhead:</strong> protocols with heavier lifecycle bookkeeping amplify both costs at high connection counts.</li>
-          </ul>
-          <p>
-            In containerized environments, this transition can happen quickly because cgroup limits make backlog growth visible as OOM risk instead of a slow degradation.
-          </p>
-        </section>
-
-        <section id="scale-behavior">
-          <h2>4. Behavior Under Scale</h2>
-          <p>
-            Scale failures are usually phased.
-          </p>
-          <ul>
-            <li>First phase: p95 drift with stable median latency.</li>
-            <li>Second phase: p99 expansion and reconnect churn.</li>
-            <li>Third phase: memory instability, write timeouts, and partial collapse in selected pods.</li>
-          </ul>
-          <p>
-            Autoscaling helps only if metrics capture these phases. Scaling on request rate alone often reacts too late.
-          </p>
-        </section>
-
-        <section id="operational-risks">
-          <h2>5. Operational Risks and When Not to Use This Approach</h2>
-          <p>
-            A benchmarking strategy centered on one-way push behavior is inappropriate when product requirements are truly duplex and low-latency in both directions.
-          </p>
-          <ul>
-            <li>Do not generalize one-way benchmark conclusions to interactive bidirectional workloads.</li>
-            <li>Do not run protocol tests without reconnection and slow-consumer scenarios.</li>
-            <li>Do not rely on averages; tail-latency and drop behavior must be primary signals.</li>
-            <li>Do not keep queue depth unbounded to preserve nominal throughput during bursts.</li>
-          </ul>
-        </section>
-
-        <section id="decision-matrix">
-          <h2>6. Decision Matrix</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Production Context</th>
-                <th>Primary Risk</th>
-                <th>Recommended Bias</th>
-                <th>Operational Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>One-way event fanout under tight memory limits</td>
-                <td>Buffer growth and OOM</td>
-                <td>SSE with bounded queues</td>
-                <td>Simpler lifecycle and easier memory control</td>
-              </tr>
-              <tr>
-                <td>Interactive duplex control channel</td>
-                <td>Round-trip semantics and protocol mismatch</td>
-                <td>WebSocket</td>
-                <td>Native bidirectional framing</td>
-              </tr>
-              <tr>
-                <td>Bursty traffic with strict p99 SLO</td>
-                <td>Scheduler jitter and backlog cascades</td>
-                <td>Protocol plus explicit shedding policy</td>
-                <td>Tail protection matters more than peak throughput</td>
-              </tr>
-              <tr>
-                <td>Kubernetes clusters with aggressive CPU limits</td>
-                <td>Throttle-induced latency amplification</td>
-                <td>Scale on latency plus queue depth</td>
-                <td>CPU-only signals miss early degradation</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="monitoring-slo">
-          <h2>7. Monitoring and SLO Implications</h2>
-          <p>
-            Push workloads need saturation-aware observability.
-          </p>
-          <ul>
-            <li><strong>Latency:</strong> track delivery p50, p95, and p99, segmented by protocol and pod.</li>
-            <li><strong>Backpressure:</strong> queue depth, enqueue drops, write timeout rate, and slow-consumer counts.</li>
-            <li><strong>Connection health:</strong> active sockets, reconnect rate, disconnect reasons, handshake failures.</li>
-            <li><strong>Container pressure:</strong> memory working set, OOM events, CPU throttled time, and restart loops.</li>
-          </ul>
-          <p>
-            SLO policy should explicitly encode degradation behavior: acceptable drop strategy, max reconnect churn, and escalation conditions when p99 rises with queue depth.
-          </p>
-        </section>
-
-        <section id="code-example">
-          <h2>Minimal Async Pattern for Bounded Delivery Under CPU Pressure</h2>
-          <p>
-            This pattern favors bounded memory and controlled shedding instead of unbounded buffering.
-          </p>
-<pre><code>import asyncio
-import time
-from collections import deque
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
-
-app = FastAPI()
-
-class DeliveryState:
-    def __init__(self, max_queue: int = 512):
-        self.q = asyncio.Queue(maxsize=max_queue)
-        self.dropped = 0
-        self.delivery_ms = deque(maxlen=2048)
-
-state = DeliveryState()
-
-async def publish(event: str) -> None:
-    if state.q.full():
-        _ = state.q.get_nowait()  # Drop oldest to cap memory.
-        state.dropped += 1
-    state.q.put_nowait((time.perf_counter(), event))
-
-async def stream(request: Request):
-    while True:
-        if await request.is_disconnected():
-            break
-        ts, event = await state.q.get()
-        state.delivery_ms.append((time.perf_counter() - ts) * 1000)
-        yield f"data: {event}\\n\\n"
-
-@app.get("/events")
-async def events(request: Request):
-    return StreamingResponse(stream(request), media_type="text/event-stream")
-</code></pre>
-        </section>
-
-        <section id="conclusion">
-          <h2>8. Engineering Conclusion</h2>
-          <p>
-            Benchmarking under CPU limits is only useful if it captures tail behavior, memory stability, and reconnection dynamics. Systems that look efficient at median latency can still fail operationally through p99 expansion and memory-driven instability.
-          </p>
-          <p>
-            Treat protocol choice as part of runtime control strategy. Prefer architectures that make saturation visible, keep buffers bounded, and recover predictably after pressure drops.
-          </p>
-        </section>
-      </article>
-
-      <p class="footer"><a href="../index.html">Back to portfolio</a></p>
-    </main>
-  </body>
+  </article>
+  <div class="page-footer">
+    <a href="../index.html">Back to portfolio</a>
+    <span class="page-footer-right">harshitsinghal13.github.io</span>
+  </div>
+</main>
+<script>
+const bar=document.getElementById('progress');
+window.addEventListener('scroll',()=>{
+  const d=document.documentElement;
+  const t=d.scrollHeight-d.clientHeight;
+  bar.style.width=t>0?(d.scrollTop/t*100)+'%':'0%';
+},{passive:true});
+</script>
+</body>
 </html>
-
