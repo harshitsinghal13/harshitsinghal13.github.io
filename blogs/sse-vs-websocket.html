@@ -1,351 +1,388 @@
 ﻿<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SSE vs WebSocket for One-Way Push in Kubernetes: Runtime and Operational Tradeoffs</title>
-    <meta name="description" content="Staff-level analysis of SSE vs WebSocket for unidirectional real-time delivery under Kubernetes constraints, with runtime, resource, and SLO implications." />
-    <meta name="author" content="Harshit Singhal" />
-    <meta name="robots" content="index,follow" />
-    <meta property="og:type" content="article" />
-    <meta property="og:title" content="SSE vs WebSocket for One-Way Push in Kubernetes" />
-    <meta property="og:description" content="Runtime-level tradeoffs across memory, CPU, latency tails, and operability for production push systems." />
-    <meta property="og:url" content="https://harshitsinghal13.github.io/blogs/sse-vs-websocket.html" />
-    <meta property="og:site_name" content="Harshit Singhal" />
-    <link rel="canonical" href="https://harshitsinghal13.github.io/blogs/sse-vs-websocket.html" />
-    <style>
-      :root {
-        --bg: #0a0f17;
-        --panel: #101826;
-        --panel-2: #131f31;
-        --text: #e7edf7;
-        --muted: #9fb0c7;
-        --line: #223247;
-        --accent: #59c3c3;
-        --code: #0b1320;
-      }
 
-      * {
-        box-sizing: border-box;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SSE vs WebSocket for One-Way Push: Runtime and Operational Tradeoffs</title>
+  <meta name="description"
+    content="Production analysis of SSE vs WebSocket for server push: memory, latency, and operational tradeoffs under scale with code examples." />
+  <meta name="author" content="Harshit Singhal" />
+  <meta name="robots" content="index,follow" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="SSE vs WebSocket for One-Way Push" />
+  <meta property="og:description"
+    content="Production analysis of SSE vs WebSocket for server push: memory, latency, and operational tradeoffs under scale with code examples." />
+  <meta property="og:url" content="https://harshitsinghal13.github.io/blogs/sse-vs-websocket.html" />
+  <meta property="og:site_name" content="Harshit Singhal" />
+  <link rel="canonical" href="https://harshitsinghal13.github.io/blogs/sse-vs-websocket.html" />
+  <style>
+    :root {
+      --bg: #0a0f17;
+      --panel: #101826;
+      --panel-2: #131f31;
+      --text: #e7edf7;
+      --muted: #9fb0c7;
+      --line: #223247;
+      --accent: #59c3c3;
+      --code: #0b1320;
+    }
 
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
+    * {
+      box-sizing: border-box;
+    }
 
-      body {
-        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-        background:
-          radial-gradient(1000px 500px at 80% -20%, rgba(89, 195, 195, 0.14), transparent 65%),
-          linear-gradient(180deg, #0a0f17 0%, #0b1220 100%);
-        color: var(--text);
-        line-height: 1.65;
-      }
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
 
-      .container {
-        max-width: 920px;
-        margin: 0 auto;
-        padding: 28px 20px 64px;
-      }
+    body {
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(1000px 500px at 80% -20%, rgba(89, 195, 195, 0.14), transparent 65%),
+        linear-gradient(180deg, #0a0f17 0%, #0b1220 100%);
+      color: var(--text);
+      line-height: 1.65;
+    }
 
-      .hero {
-        background: linear-gradient(180deg, rgba(19, 31, 49, 0.7), rgba(16, 24, 38, 0.4));
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 26px;
-      }
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
 
-      .eyebrow {
-        margin: 0;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-size: 0.78rem;
-        font-weight: 600;
-      }
+    .hero {
+      background: linear-gradient(180deg, rgba(19, 31, 49, 0.7), rgba(16, 24, 38, 0.4));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 26px;
+    }
 
-      h1 {
-        margin: 10px 0 10px;
-        line-height: 1.22;
-        font-size: clamp(1.8rem, 4.2vw, 2.45rem);
-      }
+    .eyebrow {
+      margin: 0;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
 
-      .subtitle {
-        margin: 0;
-        color: var(--muted);
-        max-width: 76ch;
-      }
+    h1 {
+      margin: 10px 0 10px;
+      line-height: 1.22;
+      font-size: clamp(1.8rem, 4.2vw, 2.45rem);
+    }
 
-      .meta {
-        margin-top: 14px;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 76ch;
+    }
 
+    .meta {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    article {
+      margin-top: 18px;
+      background: rgba(16, 24, 38, 0.55);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 8px 24px 22px;
+    }
+
+    section {
+      padding-top: 24px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.25rem;
+      line-height: 1.35;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: #d7e1ef;
+    }
+
+    ul {
+      margin: 0 0 12px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin: 6px 0;
+      color: #d7e1ef;
+    }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      padding: 10px 12px;
+      background: rgba(89, 195, 195, 0.08);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--panel-2);
+      font-weight: 600;
+      color: #e6eefc;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    .footer {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 700px) {
+
+      .hero,
       article {
-        margin-top: 18px;
-        background: rgba(16, 24, 38, 0.55);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 8px 24px 22px;
-      }
-
-      section {
-        padding-top: 24px;
-      }
-
-      h2 {
-        margin: 0 0 10px;
-        font-size: 1.25rem;
-        line-height: 1.35;
-      }
-
-      p {
-        margin: 0 0 12px;
-        color: #d7e1ef;
-      }
-
-      ul {
-        margin: 0 0 12px;
-        padding-left: 20px;
-      }
-
-      li {
-        margin: 6px 0;
-        color: #d7e1ef;
-      }
-
-      .note {
-        border-left: 3px solid var(--accent);
-        padding: 10px 12px;
-        background: rgba(89, 195, 195, 0.08);
-        border-radius: 8px;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 8px;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        overflow: hidden;
+        padding-left: 16px;
+        padding-right: 16px;
       }
 
       th,
       td {
-        text-align: left;
-        padding: 12px;
-        border-bottom: 1px solid var(--line);
-        vertical-align: top;
+        padding: 10px;
       }
+    }
+  </style>
+</head>
 
-      th {
-        background: var(--panel-2);
-        font-weight: 600;
-        color: #e6eefc;
-      }
+<body>
+  <main class="container">
+    <header class="hero">
+      <p class="eyebrow">Backend and Platform Engineering</p>
+      <h1>SSE vs WebSocket for One-Way Push: Runtime and Operational Tradeoffs</h1>
+      <p class="subtitle">
+        For unidirectional real-time delivery, choosing between SSE and WebSocket is primarily about failure modes,
+        memory behavior, and tail-latency control under container limits, not feature parity.
+      </p>
+      <p class="meta">By Harshit Singhal | March 3, 2026</p>
+    </header>
 
-      tr:last-child td {
-        border-bottom: 0;
-      }
+    <article>
+      <p>
+        When scaling server-to-client push systems, the choice between Server-Sent Events (SSE) and WebSocket determines
+        your operational burden under production load. This analysis examines runtime behavior, memory patterns, and
+        tail latency tradeoffs for unidirectional real-time delivery.
+      </p>
+      <p>
+        For one-way server push, the protocol decision is mostly about failure shape, memory behavior, and latency tail
+        control under runtime limits, not feature parity.
+      </p>
 
-      pre {
-        margin: 10px 0 0;
-        padding: 14px;
-        overflow-x: auto;
-        background: var(--code);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-      }
-
-      code,
-      pre {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-        font-size: 0.9rem;
-      }
-
-      .footer {
-        margin-top: 20px;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-
-      a {
-        color: var(--accent);
-        text-decoration: none;
-      }
-
-      a:hover {
-        text-decoration: underline;
-      }
-
-      @media (max-width: 700px) {
-        .hero,
-        article {
-          padding-left: 16px;
-          padding-right: 16px;
-        }
-
-        th,
-        td {
-          padding: 10px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="container">
-      <header class="hero">
-        <p class="eyebrow">Backend and Platform Engineering</p>
-        <h1>SSE vs WebSocket for One-Way Push in Kubernetes: Runtime and Operational Tradeoffs</h1>
-        <p class="subtitle">
-          For unidirectional real-time delivery, the protocol decision is mostly about failure shape, memory behavior, and latency tail control under container limits, not feature parity.
+      <section id="executive-framing">
+        <h2>1. Executive Framing</h2>
+        <p>
+          Teams often pick WebSocket by default, then spend quarters containing emergent behavior at high concurrency:
+          memory ballooning, opaque backpressure, and unstable p99 latency during noisy-neighbor periods.
+          For one-way server-to-client streams, SSE frequently delivers a lower operational burden with more predictable
+          saturation behavior.
         </p>
-        <p class="meta">By Harshit Singhal | March 3, 2026</p>
-      </header>
+        <p class="note">
+          The question is not which protocol is more capable. The question is which runtime path remains debuggable when
+          runtimes are CPU-throttled and connection counts are high.
+        </p>
+      </section>
 
-      <article>
-        <section id="executive-framing">
-          <h2>1. Executive Framing</h2>
-          <p>
-            Teams often pick WebSocket by default, then spend quarters containing emergent behavior at high concurrency: memory ballooning, opaque backpressure, and unstable p99 latency during noisy-neighbor periods.
-            For one-way server-to-client streams, SSE frequently delivers a lower operational burden with more predictable saturation behavior.
-          </p>
-          <p class="note">
-            The question is not which protocol is more capable. The question is which runtime path remains debuggable when pods are CPU-throttled and connection counts are high.
-          </p>
-        </section>
+      <section id="architecture">
+        <h2>2. Protocol and Runtime Architecture</h2>
+        <p>
+          In async server stacks, SSE is an HTTP response stream over a long-lived request lifecycle. That keeps load
+          balancer behavior, middleware, and instrumentation aligned with existing HTTP control planes.
+          WebSocket introduces an upgrade lifecycle with explicit connection state, heartbeat policy, and bidirectional
+          framing mechanics.
+        </p>
+        <ul>
+          <li><strong>SSE lifecycle:</strong> accept request, attach stream producer, flush events, close on client
+            disconnect or server policy.</li>
+          <li><strong>WebSocket lifecycle:</strong> HTTP upgrade, maintain protocol state machine, negotiate keepalive
+            semantics, manage outbound and inbound frame buffers.</li>
+          <li><strong>Event loop impact:</strong> SSE workloads are mostly write-path scheduling; WebSocket adds more
+            state transitions per connection and tighter coupling to heartbeat cadence.</li>
+        </ul>
+        <p>
+          Under pressure, the simpler lifecycle tends to produce clearer failure modes. Complexity is not free when
+          thousands of sockets share one loop.
+        </p>
+      </section>
 
-        <section id="architecture">
-          <h2>2. Protocol and Runtime Architecture</h2>
-          <p>
-            In Python async stacks, SSE is an HTTP response stream over a long-lived request lifecycle. That keeps load balancer behavior, middleware, and instrumentation aligned with existing HTTP control planes.
-            WebSocket introduces an upgrade lifecycle with explicit connection state, heartbeat policy, and bidirectional framing mechanics.
-          </p>
-          <ul>
-            <li><strong>SSE lifecycle:</strong> accept request, attach stream producer, flush events, close on client disconnect or server policy.</li>
-            <li><strong>WebSocket lifecycle:</strong> HTTP upgrade, maintain protocol state machine, negotiate keepalive semantics, manage outbound and inbound frame buffers.</li>
-            <li><strong>Event loop impact:</strong> SSE workloads are mostly write-path scheduling; WebSocket adds more state transitions per connection and tighter coupling to heartbeat cadence.</li>
-          </ul>
-          <p>
-            Under pressure, the simpler lifecycle tends to produce clearer failure modes. Complexity is not free when thousands of sockets share one loop.
-          </p>
-        </section>
+      <section id="resource-costs">
+        <h2>3. Resource Cost Analysis: CPU, Memory, Connection State</h2>
+        <p>
+          CPU and memory costs diverge meaningfully once concurrency rises beyond a modest baseline.
+        </p>
+        <ul>
+          <li><strong>CPU:</strong> WebSocket commonly pays additional protocol-management overhead, especially with
+            active keepalive and bidirectional framing. SSE cost is usually concentrated in serialization and write
+            flush cadence.</li>
+          <li><strong>Memory:</strong> WebSocket risk is memory amplification through per-connection buffers and
+            unsignaled backlog growth. SSE can still leak memory if queues are unbounded, but the model is easier to
+            constrain.</li>
+          <li><strong>State surface:</strong> More connection state means more edge cases during deploy rollouts, proxy
+            restarts, and intermittent packet loss.</li>
+        </ul>
+        <p>
+          In production environments with resource isolation, these differences become visible quickly because hard
+          memory and CPU limits turn soft inefficiencies into hard failure behavior.
+        </p>
+      </section>
 
-        <section id="resource-costs">
-          <h2>3. Resource Cost Analysis: CPU, Memory, Connection State</h2>
-          <p>
-            CPU and memory costs diverge meaningfully once concurrency rises beyond a modest baseline.
-          </p>
-          <ul>
-            <li><strong>CPU:</strong> WebSocket commonly pays additional protocol-management overhead, especially with active keepalive and bidirectional framing. SSE cost is usually concentrated in serialization and write flush cadence.</li>
-            <li><strong>Memory:</strong> WebSocket risk is memory amplification through per-connection buffers and unsignaled backlog growth. SSE can still leak memory if queues are unbounded, but the model is easier to constrain.</li>
-            <li><strong>State surface:</strong> More connection state means more edge cases during deploy rollouts, proxy restarts, and intermittent packet loss.</li>
-          </ul>
-          <p>
-            In Kubernetes, these differences become visible quickly because cgroup limits turn soft inefficiencies into hard failure behavior.
-          </p>
-        </section>
+      <section id="behavior-under-scale">
+        <h2>4. Behavior Under Scale</h2>
+        <p>
+          Throughput can remain stable while user experience degrades. The earliest signal is usually latency tail
+          expansion, not median latency drift.
+        </p>
+        <ul>
+          <li>p95 often starts rising before alerting thresholds fire on raw request volume.</li>
+          <li>p99 is where buffer growth and scheduler contention become obvious.</li>
+          <li>When CPU throttling increases, jitter in flush cadence widens, and tail latency becomes noisy.</li>
+        </ul>
+        <p>
+          The practical target is graceful degradation: bounded queues, deterministic shedding, and fast recovery when
+          pressure falls.
+        </p>
+      </section>
 
-        <section id="behavior-under-scale">
-          <h2>4. Behavior Under Scale</h2>
-          <p>
-            Throughput can remain stable while user experience degrades. The earliest signal is usually latency tail expansion, not median latency drift.
-          </p>
-          <ul>
-            <li>p95 often starts rising before alerting thresholds fire on raw request volume.</li>
-            <li>p99 is where buffer growth and scheduler contention become obvious.</li>
-            <li>When CPU throttling increases, jitter in flush cadence widens, and tail latency becomes noisy.</li>
-          </ul>
-          <p>
-            The practical target is graceful degradation: bounded queues, deterministic shedding, and fast recovery when pressure falls.
-          </p>
-        </section>
+      <section id="operational-risks">
+        <h2>5. Operational Risks and When Not to Use This Approach</h2>
+        <p>
+          Prefer SSE only when traffic is truly one-way. Do not force SSE into workflows that require low-latency
+          client-to-server signaling, custom binary framing, or tightly coupled duplex control loops.
+        </p>
+        <ul>
+          <li>Do not use SSE for interactive bidirectional sessions where client events are first-class.</li>
+          <li>Do not rely on either protocol without explicit bounded buffering per connection.</li>
+          <li>Do not ignore intermediary timeout behavior; default idle timers can cause reconnection storms.</li>
+          <li>Do not scale solely on CPU for push workloads; memory and queue pressure must participate.</li>
+        </ul>
+      </section>
 
-        <section id="operational-risks">
-          <h2>5. Operational Risks and When Not to Use This Approach</h2>
-          <p>
-            Prefer SSE only when traffic is truly one-way. Do not force SSE into workflows that require low-latency client-to-server signaling, custom binary framing, or tightly coupled duplex control loops.
-          </p>
-          <ul>
-            <li>Do not use SSE for interactive bidirectional sessions where client events are first-class.</li>
-            <li>Do not rely on either protocol without explicit bounded buffering per connection.</li>
-            <li>Do not ignore intermediary timeout behavior; default idle timers can cause reconnection storms.</li>
-            <li>Do not autoscale solely on CPU for push workloads; memory and queue pressure must participate.</li>
-          </ul>
-        </section>
+      <section id="decision-matrix">
+        <h2>6. Decision Matrix</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Criterion</th>
+              <th>SSE</th>
+              <th>WebSocket</th>
+              <th>Preferred</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Server-to-client only feed</td>
+              <td>Simple lifecycle, HTTP-native ops</td>
+              <td>Works, but higher state surface</td>
+              <td>SSE</td>
+            </tr>
+            <tr>
+              <td>Bidirectional interactive control</td>
+              <td>Awkward and fragmented</td>
+              <td>Native duplex channel</td>
+              <td>WebSocket</td>
+            </tr>
+            <tr>
+              <td>High concurrency under strict memory limits</td>
+              <td>Typically easier to bound</td>
+              <td>Higher risk of buffer-driven instability</td>
+              <td>SSE</td>
+            </tr>
+            <tr>
+              <td>Protocol/tooling operability in HTTP infra</td>
+              <td>Strong alignment</td>
+              <td>Requires explicit tuning and observability work</td>
+              <td>SSE</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
 
-        <section id="decision-matrix">
-          <h2>6. Decision Matrix</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Criterion</th>
-                <th>SSE</th>
-                <th>WebSocket</th>
-                <th>Preferred</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Server-to-client only feed</td>
-                <td>Simple lifecycle, HTTP-native ops</td>
-                <td>Works, but higher state surface</td>
-                <td>SSE</td>
-              </tr>
-              <tr>
-                <td>Bidirectional interactive control</td>
-                <td>Awkward and fragmented</td>
-                <td>Native duplex channel</td>
-                <td>WebSocket</td>
-              </tr>
-              <tr>
-                <td>High concurrency under strict memory limits</td>
-                <td>Typically easier to bound</td>
-                <td>Higher risk of buffer-driven instability</td>
-                <td>SSE</td>
-              </tr>
-              <tr>
-                <td>Protocol/tooling operability in HTTP infra</td>
-                <td>Strong alignment</td>
-                <td>Requires explicit tuning and observability work</td>
-                <td>SSE</td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
+      <section id="monitoring-slo">
+        <h2>7. Monitoring and SLO Implications</h2>
+        <p>
+          Instrument around saturation mechanics, not only request counters.
+        </p>
+        <ul>
+          <li><strong>Latency:</strong> track p50/p95/p99 for end-to-end event delivery, not only server response times.
+          </li>
+          <li><strong>Connection health:</strong> active connections, reconnect rate, disconnect reasons, and
+            reconnection storm detection.</li>
+          <li><strong>Backpressure:</strong> per-connection queue depth, dropped-event counters, and write timeout
+            rates.</li>
+          <li><strong>Runtime pressure:</strong> memory usage, OOM events, CPU throttled time, and GC pause
+            distribution.</li>
+        </ul>
+        <p>
+          SLO design should include tail-latency error budgets and controlled degradation policy. If p99 delivery drifts
+          while queue depth climbs, treat it as user-visible failure even if throughput appears healthy.
+        </p>
+      </section>
 
-        <section id="monitoring-slo">
-          <h2>7. Monitoring and SLO Implications</h2>
-          <p>
-            Instrument around saturation mechanics, not only request counters.
-          </p>
-          <ul>
-            <li><strong>Latency:</strong> track p50/p95/p99 for end-to-end event delivery, not only server response times.</li>
-            <li><strong>Connection health:</strong> active connections, reconnect rate, disconnect reasons, and reconnection storm detection.</li>
-            <li><strong>Backpressure:</strong> per-connection queue depth, dropped-event counters, and write timeout rates.</li>
-            <li><strong>Container pressure:</strong> cgroup memory usage, OOM kill events, CPU throttled time, and GC pause distribution.</li>
-          </ul>
-          <p>
-            SLO design should include tail-latency error budgets and controlled degradation policy. If p99 delivery drifts while queue depth climbs, treat it as user-visible failure even if throughput appears healthy.
-          </p>
-        </section>
-
-        <section id="code-example">
-          <h2>Minimal FastAPI Pattern with Bounded Queue</h2>
-          <p>
-            The key property is bounded buffering with deterministic drop policy. This keeps memory predictable under transient spikes.
-          </p>
-<pre><code>import asyncio
+      <section id="code-example">
+        <h2>Minimal Dependency-Free Pattern with Bounded Queue</h2>
+        <p>
+          The key property is bounded buffering with deterministic drop policy. This keeps memory predictable under
+          transient spikes.
+        </p>
+        <pre><code>import asyncio
 import json
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from typing import AsyncIterator
 
-app = FastAPI()
-
-async def event_stream(request: Request) -> asyncio.AsyncIterator[str]:
+async def event_stream(client_disconnected: asyncio.Event) -> AsyncIterator[str]:
     q: asyncio.Queue[dict] = asyncio.Queue(maxsize=256)
 
     async def producer() -> None:
@@ -358,35 +395,32 @@ async def event_stream(request: Request) -> asyncio.AsyncIterator[str]:
 
     task = asyncio.create_task(producer())
     try:
-        while True:
-            if await request.is_disconnected():
-                break
+        while not client_disconnected.is_set():
             item = await q.get()
+            # SSE frame format: one event per double newline.
             yield f"data: {json.dumps(item)}\\n\\n"
     finally:
         task.cancel()
-
-@app.get("/events")
-async def events(request: Request) -> StreamingResponse:
-    headers = {"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    return StreamingResponse(event_stream(request), media_type="text/event-stream", headers=headers)
 </code></pre>
-        </section>
+      </section>
 
-        <section id="conclusion">
-          <h2>8. Engineering Conclusion</h2>
-          <p>
-            For one-way push in Kubernetes, SSE is often the stronger default because it reduces state complexity, constrains memory behavior more naturally, and keeps operational visibility aligned with HTTP tooling.
-            Choose WebSocket when duplex interaction is a hard requirement, not as a reflex.
-          </p>
-          <p>
-            The protocol decision should be validated against tail latency, cgroup pressure, and recovery behavior under bursty load. Build for graceful failure first. Peak throughput follows from disciplined runtime design.
-          </p>
-        </section>
-      </article>
+      <section id="conclusion">
+        <h2>8. Engineering Conclusion</h2>
+        <p>
+          For one-way push, SSE is often the stronger default because it reduces state complexity, constrains memory
+          behavior more naturally, and keeps operational visibility aligned with HTTP tooling.
+          Choose WebSocket when duplex interaction is a hard requirement, not as a reflex.
+        </p>
+        <p>
+          The protocol decision should be validated against tail latency, runtime pressure, and recovery behavior under
+          bursty load. Build for graceful failure first. Peak throughput follows from disciplined runtime design.
+        </p>
+      </section>
 
-      <p class="footer"><a href="../index.html">Back to portfolio</a></p>
-    </main>
-  </body>
+    </article>
+
+    <p class="footer"><a href="../index.html">Back to portfolio</a></p>
+  </main>
+</body>
+
 </html>
-
