@@ -6,7 +6,5 @@ Quick summaries of current blog posts:
 
 Link: [blogs/concurrency-bug.html](./blogs/concurrency-bug.html)
 
-Summary: A deep dive into a subtle concurrency bug that evaded detection for
-            over a year, exploring the root cause, debugging process, and
-            lessons learned for building more robust systems.
+Summary: A subtle race condition in parallel batch processing caused silent data corruption despite using thread-safe collections. The bug surfaced only under specific runtime timing.
 
