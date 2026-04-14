@@ -1,165 +1,196 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>This Concurrency Bug Stayed Hidden for a Year</title>
 
 <style>
+:root {
+  --bg: #0a0f17;
+  --panel: #101826;
+  --panel-2: #131f31;
+  --text: #e7edf7;
+  --muted: #9fb0c7;
+  --line: #223247;
+  --accent: #59c3c3;
+  --code: #0b1320;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin:0; padding:0; }
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    line-height: 1.7;
-    margin: 0;
-    background: #0f172a;
-    color: #e2e8f0;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background:
+    radial-gradient(1000px 500px at 80% -20%, rgba(89,195,195,0.14), transparent 65%),
+    linear-gradient(180deg, #0a0f17 0%, #0b1220 100%);
+  color: var(--text);
+  line-height: 1.65;
 }
 
 .container {
-    max-width: 900px;
-    margin: auto;
-    padding: 40px 20px;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+}
+
+.hero {
+  background: linear-gradient(180deg, rgba(19,31,49,0.7), rgba(16,24,38,0.4));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 26px;
+}
+
+.eyebrow {
+  margin:0;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-size:.78rem;
+  font-weight:600;
 }
 
 h1 {
-    font-size: 2.5rem;
-    margin-bottom: 20px;
+  margin:10px 0 10px;
+  line-height:1.22;
+  font-size: clamp(1.8rem, 4.2vw, 2.45rem);
 }
+
+.subtitle {
+  margin:0;
+  color:var(--muted);
+  max-width:76ch;
+}
+
+.meta {
+  margin-top:14px;
+  color:var(--muted);
+  font-size:.92rem;
+}
+
+article {
+  margin-top:18px;
+  background: rgba(16,24,38,0.55);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:8px 24px 22px;
+}
+
+section { padding-top:24px; }
 
 h2 {
-    margin-top: 40px;
-    border-bottom: 1px solid #1e293b;
-    padding-bottom: 8px;
+  margin:0 0 10px;
+  font-size:1.25rem;
 }
 
-p {
-    margin: 16px 0;
-}
+p { margin:0 0 12px; color:#d7e1ef; }
 
-ul {
-    padding-left: 20px;
-}
+ul { margin:0 0 12px; padding-left:20px; }
+li { margin:6px 0; color:#d7e1ef; }
 
-li {
-    margin: 8px 0;
-}
-
-code {
-    background: #1e293b;
-    padding: 3px 6px;
-    border-radius: 4px;
+.note {
+  border-left:3px solid var(--accent);
+  padding:10px 12px;
+  background: rgba(89,195,195,0.08);
+  border-radius:8px;
 }
 
 pre {
-    background: #020617;
-    padding: 16px;
-    border-radius: 8px;
-    overflow-x: auto;
-    border: 1px solid #1e293b;
+  margin:10px 0 0;
+  padding:14px;
+  overflow-x:auto;
+  background:var(--code);
+  border:1px solid var(--line);
+  border-radius:10px;
 }
 
-pre code {
-    background: none;
-    padding: 0;
+code, pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size:.9rem;
 }
 
-blockquote {
-    border-left: 4px solid #38bdf8;
-    padding-left: 16px;
-    color: #94a3b8;
-}
-
-hr {
-    border: none;
-    border-top: 1px solid #1e293b;
-    margin: 40px 0;
+.footer {
+  margin-top:20px;
+  color:var(--muted);
+  font-size:.92rem;
 }
 
 .tag {
-    display: inline-block;
-    background: #1e293b;
-    padding: 6px 10px;
-    margin-right: 8px;
-    border-radius: 6px;
-    font-size: 12px;
+  display:inline-block;
+  background:var(--panel-2);
+  padding:6px 10px;
+  margin-right:8px;
+  border-radius:6px;
+  font-size:12px;
+  color:var(--muted);
 }
+
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<main class="container">
 
-<h1>This Concurrency Bug Stayed Hidden for a Year</h1>
+<header class="hero">
+  <p class="eyebrow">Concurrency & Multithreading</p>
+  <h1>This Concurrency Bug Stayed Hidden for a Year</h1>
+  <p class="subtitle">
+    A subtle race condition in parallel batch processing caused silent data corruption
+    despite using thread-safe collections. The bug surfaced only under specific runtime timing.
+  </p>
+  <p class="meta">By Harshit Singhal | 2026</p>
+</header>
 
-<p>We had a background job that processed thousands of records in parallel.<br>
+<article>
+
+<p>We had a background job that processed thousands of records in parallel.
 Each batch ran concurrently, and we kept track of total successful and failed records.</p>
 
 <p>Everything worked perfectly.</p>
-
 <p>For almost a year.</p>
-
 <p>Then one day, the totals started becoming… wrong.</p>
 
-<p>No exceptions.<br>
-No crashes.<br>
-Just incorrect numbers.</p>
-
-<hr>
-
+<section>
 <h2>The Setup</h2>
-
 <ul>
 <li>Records processed in chunks</li>
 <li>Multiple chunks running concurrently</li>
 <li>Shared counters tracking totals</li>
 <li>Periodic database updates with progress</li>
 </ul>
+</section>
 
-<p>All standard parallel batch processing.</p>
-
-<p>And yet — totals drifted.</p>
-
-<hr>
-
+<section>
 <h2>The Symptom</h2>
-
 <ul>
 <li>Some runs showed fewer successful records than expected</li>
 <li>Re-running the same data produced different counts</li>
 <li>The issue appeared only in one environment</li>
 </ul>
+</section>
 
-<p>Classic signs of a concurrency issue.</p>
-
-<p>But the tricky part?</p>
-
-<p>We were already using thread-safe collections.</p>
-
-<hr>
-
+<section>
 <h2>What Was Actually Happening</h2>
-
 <pre><code>Initial total = 10
-
 Worker A reads total (10)
 Worker B reads total (10)
 
 Worker A increments → 11
-Worker B increments → 11  (overwrites A)
+Worker B increments → 11
 
-Final total = 11  ❌ (should be 12)
+Final total = 11 (should be 12)
 </code></pre>
+<p>This is a classic lost update race condition.</p>
+</section>
 
-<p>No exception.<br>
-No crash.<br>
-Just a lost update.</p>
-
-<p>This is a race condition.</p>
-
-<hr>
-
+<section>
 <h2>The Buggy Code</h2>
-
 <pre><code class="language-csharp">int totalSuccess = 0;
 
 Parallel.ForEach(records, record =>
@@ -168,49 +199,17 @@ Parallel.ForEach(records, record =>
     {
         totalSuccess++; // not atomic
     }
-});
-</code></pre>
+});</code></pre>
+</section>
 
-<p><code>++</code> is not atomic. It performs:</p>
-
-<ol>
-<li>Read</li>
-<li>Increment</li>
-<li>Write</li>
-</ol>
-
-<p>Multiple threads interleaving these steps leads to lost updates.</p>
-
-<hr>
-
+<section>
 <h2>Why volatile Alone Doesn't Fix It</h2>
+<pre><code class="language-csharp">private static volatile int totalSuccess = 0;</code></pre>
+<p>This ensures visibility, but not atomicity.</p>
+</section>
 
-<pre><code class="language-csharp">private static volatile int totalSuccess = 0;
-</code></pre>
-
-<p>This ensures visibility, but <strong>not atomicity</strong>.</p>
-
-<p>Two threads can still overwrite each other.</p>
-
-<hr>
-
-<h2>Why It Took a Year to Appear</h2>
-
-<p>Concurrency bugs are timing dependent.</p>
-
-<p>The race condition existed from the beginning, but it didn’t surface consistently.
-In fact, it only appeared in one environment.</p>
-
-<p>Subtle runtime differences — thread scheduling, CPU contention, and execution timing — 
-made overlapping updates more likely there, eventually exposing the issue.</p>
-
-<p>No code changes were required.<br>
-Just different timing.</p>
-
-<hr>
-
+<section>
 <h2>The Fix: Atomic Counters</h2>
-
 <pre><code class="language-csharp">int totalSuccess = 0;
 
 Parallel.ForEach(records, record =>
@@ -219,13 +218,11 @@ Parallel.ForEach(records, record =>
     {
         Interlocked.Increment(ref totalSuccess);
     }
-});
-</code></pre>
+});</code></pre>
+</section>
 
-<hr>
-
+<section>
 <h2>Snapshot-Based Progress Reporting</h2>
-
 <pre><code class="language-csharp">var finished = Interlocked.Increment(ref completedChunks);
 
 if (finished % maxConcurrency == 0)
@@ -237,52 +234,34 @@ if (finished % maxConcurrency == 0)
     job.TotalFailedRecords = failureSnapshot;
 
     await UpdateJobProgress(job);
-}
-</code></pre>
+}</code></pre>
+</section>
 
-<p>This ensures:</p>
-
-<ul>
-<li>Atomic updates</li>
-<li>Latest value visibility</li>
-<li>Consistent progress snapshots</li>
-<li>Reduced contention</li>
-</ul>
-
-<hr>
-
+<section>
 <h2>Lessons Learned</h2>
-
 <ul>
 <li>Thread-safe collections ≠ thread-safe logic</li>
-<li><code>++</code> is not atomic</li>
-<li><code>volatile</code> ensures visibility, not correctness</li>
-<li>Use <code>Interlocked</code> for counters</li>
-<li>Use <code>Volatile.Read</code> for snapshots</li>
+<li>++ is not atomic</li>
+<li>volatile ensures visibility, not correctness</li>
+<li>Use Interlocked for counters</li>
+<li>Use snapshot reads for reporting</li>
 <li>Reduce shared mutable state</li>
-<li>Batch progress updates</li>
 <li>Concurrency bugs are timing dependent</li>
 </ul>
+</section>
 
-<hr>
-
+<section>
 <h2>Takeaway</h2>
-
 <p>If you're running parallel batch jobs and tracking totals:</p>
-
 <ul>
 <li>Use atomic counters</li>
 <li>Take snapshot reads for reporting</li>
 <li>Avoid frequent shared writes</li>
 </ul>
+<p><strong>Otherwise, everything may look fine… until it doesn't.</strong></p>
+</section>
 
-<p>Otherwise, everything may look fine…</p>
-
-<p><strong>Until it doesn't.</strong></p>
-
-<hr>
-
-<div>
+<div style="margin-top:18px;">
 <span class="tag">#concurrency</span>
 <span class="tag">#multithreading</span>
 <span class="tag">#csharp</span>
@@ -290,7 +269,10 @@ if (finished % maxConcurrency == 0)
 <span class="tag">#performance</span>
 </div>
 
-</div>
+</article>
 
+<p class="footer"><a href="../index.html">Back to portfolio</a></p>
+
+</main>
 </body>
 </html>
