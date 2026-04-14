@@ -2,14 +2,11 @@
 
 Quick summaries of current blog posts:
 
-## 1) SSE vs WebSocket for One-Way Push
+## 1) SSE vs WebSocket for One-Way Push -- AI Generated 
 
-Link: [blogs/sse-vs-websocket.html](./blogs/sse-vs-websocket.html)
+Link: [blogs/concurrency-bug.html](./blogs/concurrency-bug.html)
 
-Summary: Compares SSE and WebSocket for unidirectional real-time delivery, focusing on operational behavior under load. It covers lifecycle complexity, memory and CPU tradeoffs, tail-latency behavior, failure modes, and a decision matrix for choosing the protocol.
+Summary: A deep dive into a subtle concurrency bug that evaded detection for
+            over a year, exploring the root cause, debugging process, and
+            lessons learned for building more robust systems.
 
-## 2) SSE vs WebSocket Under CPU Limits
-
-Link: [blogs/benchmarking-lessons.html](./blogs/benchmarking-lessons.html)
-
-Summary: Shares production-oriented benchmarking lessons on what degrades first when systems are CPU-constrained. It highlights practical signals like p95/p99 latency drift, throttling effects, and how to interpret runtime behavior before failures become user-visible.
