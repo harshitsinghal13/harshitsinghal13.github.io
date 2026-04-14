@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>This Concurrency Bug Stayed Hidden for a Year</title>
+
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.7;
+    margin: 0;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    padding: 40px 20px;
+}
+
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 20px;
+}
+
+h2 {
+    margin-top: 40px;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 8px;
+}
+
+p {
+    margin: 16px 0;
+}
+
+ul {
+    padding-left: 20px;
+}
+
+li {
+    margin: 8px 0;
+}
+
+code {
+    background: #1e293b;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+pre {
+    background: #020617;
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid #1e293b;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+}
+
+blockquote {
+    border-left: 4px solid #38bdf8;
+    padding-left: 16px;
+    color: #94a3b8;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #1e293b;
+    margin: 40px 0;
+}
+
+.tag {
+    display: inline-block;
+    background: #1e293b;
+    padding: 6px 10px;
+    margin-right: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>This Concurrency Bug Stayed Hidden for a Year</h1>
+
+<p>We had a background job that processed thousands of records in parallel.<br>
+Each batch ran concurrently, and we kept track of total successful and failed records.</p>
+
+<p>Everything worked perfectly.</p>
+
+<p>For almost a year.</p>
+
+<p>Then one day, the totals started becoming… wrong.</p>
+
+<p>No exceptions.<br>
+No crashes.<br>
+Just incorrect numbers.</p>
+
+<hr>
+
+<h2>The Setup</h2>
+
+<ul>
+<li>Records processed in chunks</li>
+<li>Multiple chunks running concurrently</li>
+<li>Shared counters tracking totals</li>
+<li>Periodic database updates with progress</li>
+</ul>
+
+<p>All standard parallel batch processing.</p>
+
+<p>And yet — totals drifted.</p>
+
+<hr>
+
+<h2>The Symptom</h2>
+
+<ul>
+<li>Some runs showed fewer successful records than expected</li>
+<li>Re-running the same data produced different counts</li>
+<li>The issue appeared only in one environment</li>
+</ul>
+
+<p>Classic signs of a concurrency issue.</p>
+
+<p>But the tricky part?</p>
+
+<p>We were already using thread-safe collections.</p>
+
+<hr>
+
+<h2>What Was Actually Happening</h2>
+
+<pre><code>Initial total = 10
+
+Worker A reads total (10)
+Worker B reads total (10)
+
+Worker A increments → 11
+Worker B increments → 11  (overwrites A)
+
+Final total = 11  ❌ (should be 12)
+</code></pre>
+
+<p>No exception.<br>
+No crash.<br>
+Just a lost update.</p>
+
+<p>This is a race condition.</p>
+
+<hr>
+
+<h2>The Buggy Code</h2>
+
+<pre><code class="language-csharp">int totalSuccess = 0;
+
+Parallel.ForEach(records, record =>
+{
+    if (Process(record))
+    {
+        totalSuccess++; // not atomic
+    }
+});
+</code></pre>
+
+<p><code>++</code> is not atomic. It performs:</p>
+
+<ol>
+<li>Read</li>
+<li>Increment</li>
+<li>Write</li>
+</ol>
+
+<p>Multiple threads interleaving these steps leads to lost updates.</p>
+
+<hr>
+
+<h2>Why volatile Alone Doesn't Fix It</h2>
+
+<pre><code class="language-csharp">private static volatile int totalSuccess = 0;
+</code></pre>
+
+<p>This ensures visibility, but <strong>not atomicity</strong>.</p>
+
+<p>Two threads can still overwrite each other.</p>
+
+<hr>
+
+<h2>Why It Took a Year to Appear</h2>
+
+<p>Concurrency bugs are timing dependent.</p>
+
+<p>The race condition existed from the beginning, but it didn’t surface consistently.
+In fact, it only appeared in one environment.</p>
+
+<p>Subtle runtime differences — thread scheduling, CPU contention, and execution timing — 
+made overlapping updates more likely there, eventually exposing the issue.</p>
+
+<p>No code changes were required.<br>
+Just different timing.</p>
+
+<hr>
+
+<h2>The Fix: Atomic Counters</h2>
+
+<pre><code class="language-csharp">int totalSuccess = 0;
+
+Parallel.ForEach(records, record =>
+{
+    if (Process(record))
+    {
+        Interlocked.Increment(ref totalSuccess);
+    }
+});
+</code></pre>
+
+<hr>
+
+<h2>Snapshot-Based Progress Reporting</h2>
+
+<pre><code class="language-csharp">var finished = Interlocked.Increment(ref completedChunks);
+
+if (finished % maxConcurrency == 0)
+{
+    var successSnapshot = Volatile.Read(ref totalSuccess);
+    var failureSnapshot = Volatile.Read(ref totalFailed);
+
+    job.TotalSuccessfulRecords = successSnapshot;
+    job.TotalFailedRecords = failureSnapshot;
+
+    await UpdateJobProgress(job);
+}
+</code></pre>
+
+<p>This ensures:</p>
+
+<ul>
+<li>Atomic updates</li>
+<li>Latest value visibility</li>
+<li>Consistent progress snapshots</li>
+<li>Reduced contention</li>
+</ul>
+
+<hr>
+
+<h2>Lessons Learned</h2>
+
+<ul>
+<li>Thread-safe collections ≠ thread-safe logic</li>
+<li><code>++</code> is not atomic</li>
+<li><code>volatile</code> ensures visibility, not correctness</li>
+<li>Use <code>Interlocked</code> for counters</li>
+<li>Use <code>Volatile.Read</code> for snapshots</li>
+<li>Reduce shared mutable state</li>
+<li>Batch progress updates</li>
+<li>Concurrency bugs are timing dependent</li>
+</ul>
+
+<hr>
+
+<h2>Takeaway</h2>
+
+<p>If you're running parallel batch jobs and tracking totals:</p>
+
+<ul>
+<li>Use atomic counters</li>
+<li>Take snapshot reads for reporting</li>
+<li>Avoid frequent shared writes</li>
+</ul>
+
+<p>Otherwise, everything may look fine…</p>
+
+<p><strong>Until it doesn't.</strong></p>
+
+<hr>
+
+<div>
+<span class="tag">#concurrency</span>
+<span class="tag">#multithreading</span>
+<span class="tag">#csharp</span>
+<span class="tag">#dotnet</span>
+<span class="tag">#performance</span>
+</div>
+
+</div>
+
+</body>
+</html>
