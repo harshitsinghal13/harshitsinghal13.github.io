@@ -1,4 +1,4 @@
-# harshitsinghal13.github.io
+# harshitsinghal13.github.io 
 
 Quick summaries of current blog posts:
 
