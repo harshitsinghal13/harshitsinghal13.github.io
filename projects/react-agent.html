@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReAct Agent Framework | Project</title>
+  <meta name="description"
+    content="Production-focused ReAct agent framework with pluggable tools, provider abstraction, SSE reasoning traces, and JWT ABAC authorization." />
+  <meta name="author" content="Harshit Singhal" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="ReAct Agent Framework" />
+  <meta property="og:description"
+    content="Production-focused ReAct agent framework with pluggable tools, provider abstraction, SSE reasoning traces, and JWT ABAC authorization." />
+  <meta property="og:url" content="https://harshitsinghal13.github.io/projects/react-agent.html" />
+  <link rel="canonical" href="https://harshitsinghal13.github.io/projects/react-agent.html" />
+  <style>
+    :root {
+      --bg: #0a1018;
+      --panel: #101826;
+      --panel-2: #13203a;
+      --text: #e7edf7;
+      --muted: #9fb0c7;
+      --line: #223247;
+      --accent: #7cc4ff;
+      --code: #0b1320;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(900px 500px at 80% -20%, rgba(124, 196, 255, 0.14), transparent 65%),
+        linear-gradient(180deg, #0a1018 0%, #0b1220 100%);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+
+    .hero {
+      background: linear-gradient(180deg, rgba(19, 32, 58, 0.7), rgba(16, 24, 38, 0.45));
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 26px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    h1 {
+      margin: 10px 0 10px;
+      line-height: 1.22;
+      font-size: clamp(1.8rem, 4.2vw, 2.45rem);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 76ch;
+    }
+
+    .meta {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .cta-row {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .cta {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.9rem;
+      background: rgba(16, 24, 38, 0.5);
+    }
+
+    .cta.primary {
+      border-color: #346394;
+      background: rgba(124, 196, 255, 0.12);
+    }
+
+    .cta:hover {
+      border-color: #4f7fb4;
+    }
+
+    .mini-stats {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mini-stat {
+      border: 1px solid #2a4363;
+      background: rgba(19, 32, 58, 0.45);
+      color: #c8d8ed;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+
+    article {
+      margin-top: 18px;
+      background: rgba(16, 24, 38, 0.56);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 8px 24px 22px;
+    }
+
+    section {
+      padding-top: 24px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      line-height: 1.35;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: #d7e1ef;
+    }
+
+    ul {
+      margin: 0 0 12px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin: 6px 0;
+      color: #d7e1ef;
+    }
+
+    .demo-wrap {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(19, 32, 58, 0.45), rgba(16, 24, 38, 0.45));
+      overflow: hidden;
+    }
+
+    .demo-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8, 14, 24, 0.6);
+    }
+
+    .demo-action {
+      border: 1px solid #2c4868;
+      border-radius: 8px;
+      background: rgba(124, 196, 255, 0.12);
+      color: #dce9f8;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .demo-action:hover {
+      border-color: #4f7fb4;
+    }
+
+    .demo-frame {
+      margin: 0;
+    }
+
+    .demo-frame img {
+      width: 100%;
+      display: block;
+      max-height: 520px;
+      object-fit: contain;
+      background: #0b1320;
+    }
+
+    .demo-frame figcaption {
+      padding: 10px 12px 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .journey {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(19, 32, 58, 0.3), rgba(16, 24, 38, 0.4));
+    }
+
+    .journey-nav {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--line);
+    }
+
+    .journey-tab {
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 8px;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+
+    .journey-tab:last-child {
+      border-right: 0;
+    }
+
+    .journey-tab:hover,
+    .journey-tab.active {
+      color: #dce9f8;
+      background: rgba(124, 196, 255, 0.12);
+    }
+
+    .journey-panel {
+      padding: 14px 14px 12px;
+    }
+
+    .journey-panel h3 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+
+    .journey-panel p {
+      margin: 0 0 10px;
+      color: #d6e2f1;
+      font-size: 0.95rem;
+    }
+
+    .journey-panel ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .journey-panel li {
+      color: #c9d7ea;
+      font-size: 0.9rem;
+    }
+
+    .journey-progress {
+      margin-top: 12px;
+      height: 7px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(124, 196, 255, 0.15);
+    }
+
+    .journey-progress span {
+      display: block;
+      height: 100%;
+      width: 25%;
+      background: linear-gradient(90deg, #5db0ef, #8acfff);
+      transition: width 180ms ease;
+    }
+
+    .cap-grid {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cap-grid li {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      background: rgba(11, 19, 32, 0.55);
+      font-size: 0.9rem;
+      color: #d5e2f2;
+    }
+
+    .cap-grid li strong {
+      color: #e6f1ff;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.92rem;
+    }
+
+    .hide {
+      display: none;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      background: var(--panel-2);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid #25415f;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .footer {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 700px) {
+
+      .hero,
+      article {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .journey-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .cap-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header class="hero">
+      <p class="eyebrow">Project</p>
+      <h1>ReAct Agent Framework</h1>
+      <p class="subtitle">
+        A production-style framework for building tool-using ReAct agents with provider abstraction, secure tool access,
+        and live reasoning trace streaming.
+      </p>
+      <p class="meta">By Harshit Singhal | April 2026</p>
+      <div class="cta-row">
+        <a class="cta primary" href="https://github.com/harshitsinghal13/react-agent-framework" target="_blank"
+          rel="noopener noreferrer">View Repository</a>
+        <a class="cta" href="#demo">Watch Demo</a>
+        <a class="cta" href="../index.html#projects">Back to Projects</a>
+      </div>
+      <div class="mini-stats" aria-label="Project highlights">
+        <span class="mini-stat">SSE Reasoning Trace</span>
+        <span class="mini-stat">Provider Abstraction</span>
+        <span class="mini-stat">JWT + ABAC</span>
+        <span class="mini-stat">Pluggable Tools</span>
+      </div>
+    </header>
+
+    <article>
+      <section id="demo">
+        <h2>Live Demo</h2>
+        <div class="demo-wrap">
+          <div class="demo-toolbar">
+            <button type="button" class="demo-action" id="replay-demo">Replay GIF</button>
+            <span id="demo-status">Loading demo...</span>
+          </div>
+          <figure class="demo-frame">
+            <img id="demo-gif" src="../assets/react-agent.gif"
+              alt="Demo of ReAct Agent Framework showing reasoning traces, tool calls, and streamed responses." loading="lazy" />
+            <figcaption>
+              Add your GIF at <code>assets/react-agent-demo.gif</code>. You can also update the image path in this file if
+              you prefer a different location.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section>
+        <h2>Interactive Flow</h2>
+        <div class="journey">
+          <div class="journey-nav" role="tablist" aria-label="Agent execution flow">
+            <button class="journey-tab active" type="button" data-step="0">1. Request</button>
+            <button class="journey-tab" type="button" data-step="1">2. Reason</button>
+            <button class="journey-tab" type="button" data-step="2">3. Tools</button>
+            <button class="journey-tab" type="button" data-step="3">4. Stream</button>
+          </div>
+          <div class="journey-panel" aria-live="polite">
+            <h3 id="journey-title">Request Intake and Policy Context</h3>
+            <p id="journey-text">
+              Incoming user prompts are validated and enriched with auth/session context before the agent loop starts.
+            </p>
+            <ul id="journey-points">
+              <li>JWT is decoded and claims are attached.</li>
+              <li>Request schema is normalized for the agent runtime.</li>
+              <li>Execution metadata is prepared for trace streaming.</li>
+            </ul>
+            <div class="journey-progress" aria-hidden="true"><span id="journey-progress"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Overview</h2>
+        <p>
+          This project is designed as an opinionated baseline for deploying ReAct-style agents in real environments.
+          Instead of focusing only on prompting, it emphasizes operational concerns like authorization boundaries,
+          observability, and provider swap-ability.
+        </p>
+      </section>
+
+      <section>
+        <h2>Key Capabilities</h2>
+        <ul class="cap-grid">
+          <li>
+            <strong>Pluggable Tool Registry</strong>
+            Add, remove, or version tools without touching agent orchestration core.
+          </li>
+          <li>
+            <strong>Provider Abstraction</strong>
+            Swap Gemini and Ollama integrations through a consistent provider interface.
+          </li>
+          <li>
+            <strong>SSE Trace Streaming</strong>
+            Stream think-act-observe events in real time to UI or debugging dashboards.
+          </li>
+          <li>
+            <strong>JWT + ABAC Enforcement</strong>
+            Restrict tool-level access per user context for safer production usage.
+          </li>
+          <li>
+            <strong>Separated Execution Layers</strong>
+            Keep planning, tool execution, and synthesis paths independent for maintainability.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Architecture Notes</h2>
+        <ul>
+          <li>API layer receives requests and validates auth context before any tool invocation is allowed.</li>
+          <li>Agent core runs iterative think-act-observe loops following the ReAct pattern.</li>
+          <li>Tool runner enforces policy checks and structured input/output contracts around each tool.</li>
+          <li>Streaming channel emits incremental agent events over SSE for UI and debugging workflows.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Tech Stack</h2>
+        <div class="tags" aria-label="Project tags">
+          <span class="tag">LLM</span>
+          <span class="tag">ReAct</span>
+          <span class="tag">FastAPI</span>
+          <span class="tag">SSE</span>
+          <span class="tag">JWT</span>
+          <span class="tag">ABAC</span>
+          <span class="tag">Agents</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Repository</h2>
+        <p>
+          Source code, setup instructions, and usage examples are available in the project repository:
+          <a href="https://github.com/harshitsinghal13/react-agent-framework" target="_blank"
+            rel="noopener noreferrer">github.com/harshitsinghal13/react-agent-framework</a>.
+        </p>
+      </section>
+    </article>
+
+    <p class="footer"><a href="../index.html#projects">Back to portfolio</a></p>
+  </main>
+  <script>
+    (function () {
+      var demoImage = document.getElementById("demo-gif");
+      var demoStatus = document.getElementById("demo-status");
+      var replayBtn = document.getElementById("replay-demo");
+
+      function setDemoStatus(text) {
+        demoStatus.textContent = text;
+      }
+
+      if (demoImage) {
+        demoImage.addEventListener("load", function () {
+          setDemoStatus("Demo loaded");
+        });
+        demoImage.addEventListener("error", function () {
+          setDemoStatus("GIF not found. Add it at assets/react-agent-demo.gif");
+        });
+      }
+
+      if (replayBtn && demoImage) {
+        replayBtn.addEventListener("click", function () {
+          var src = demoImage.getAttribute("src");
+          demoImage.setAttribute("src", "");
+          window.requestAnimationFrame(function () {
+            demoImage.setAttribute("src", src);
+          });
+        });
+      }
+
+      var steps = [
+        {
+          title: "Request Intake and Policy Context",
+          text: "Incoming user prompts are validated and enriched with auth/session context before the agent loop starts.",
+          points: [
+            "JWT is decoded and claims are attached.",
+            "Request schema is normalized for the agent runtime.",
+            "Execution metadata is prepared for trace streaming."
+          ]
+        },
+        {
+          title: "Reasoning Loop (ReAct)",
+          text: "The planner iterates through thought-action-observation steps and selects tool calls only when needed.",
+          points: [
+            "Prompt templates keep reasoning format structured.",
+            "Intermediate state is recorded for traceability.",
+            "Loop guards prevent runaway iterations."
+          ]
+        },
+        {
+          title: "Tool Invocation with ABAC",
+          text: "Every tool request passes through policy checks and typed input/output contracts before execution.",
+          points: [
+            "Denied tool calls are blocked with explicit reasons.",
+            "Allowed calls are executed through a registry layer.",
+            "Results are normalized for downstream synthesis."
+          ]
+        },
+        {
+          title: "SSE Response and Observability",
+          text: "Reasoning events and final answer are streamed over SSE so users can watch progress in real time.",
+          points: [
+            "Each event can be consumed by UI as a timeline.",
+            "Tail stages include final synthesis and completion signal.",
+            "Trace events support fast debugging in production."
+          ]
+        }
+      ];
+
+      var tabs = document.querySelectorAll(".journey-tab");
+      var titleEl = document.getElementById("journey-title");
+      var textEl = document.getElementById("journey-text");
+      var pointsEl = document.getElementById("journey-points");
+      var progressEl = document.getElementById("journey-progress");
+
+      function renderStep(index) {
+        var step = steps[index];
+        tabs.forEach(function (tab) {
+          tab.classList.toggle("active", Number(tab.dataset.step) === index);
+        });
+        titleEl.textContent = step.title;
+        textEl.textContent = step.text;
+        pointsEl.innerHTML = "";
+        step.points.forEach(function (item) {
+          var li = document.createElement("li");
+          li.textContent = item;
+          pointsEl.appendChild(li);
+        });
+        progressEl.style.width = String((index + 1) * 25) + "%";
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          renderStep(Number(tab.dataset.step));
+        });
+      });
+    })();
+  </script>
+</body>
+
+</html>

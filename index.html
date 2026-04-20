@@ -1,64 +1,65 @@
 ﻿<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Harshit Singhal | Technical Blog</title>
-    <meta
-      name="description"
-      content="Backend engineer writing about API architecture, authentication, and real-world system tradeoffs."
-    />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <!-- Minimal top navigation -->
-    <header class="site-header">
-      <div class="wrap nav-row">
-        <nav class="site-nav" aria-label="Primary">
-          <a href="#blog">Blog</a>
-          <a href="#about">About</a>
-          <a href="#contact">Contact</a>
-        </nav>
-      </div>
-    </header>
 
-    <main class="wrap">
-      <!-- Top section: name + single positioning line -->
-      <section class="top" aria-labelledby="site-title">
-        <h1 id="site-title">Harshit Singhal</h1>
-        <p class="positioning">
-          Backend engineer writing about API architecture, authentication, and
-          real-world system tradeoffs.
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Harshit Singhal | Technical Blog</title>
+  <meta name="description"
+    content="Backend engineer writing about API architecture, authentication, and real-world system tradeoffs." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <!-- Minimal top navigation -->
+  <header class="site-header">
+    <div class="wrap nav-row">
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#blog">Blog</a>
+        <a href="#projects">Projects</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Top section: name + single positioning line -->
+    <section class="top" aria-labelledby="site-title">
+      <h1 id="site-title">Harshit Singhal</h1>
+      <p class="positioning">
+        Backend engineer writing about API architecture, authentication, and
+        real-world system tradeoffs.
+      </p>
+    </section>
+
+    <!-- Blog list: title, summary, date, and tags -->
+    <section id="blog" class="section" aria-labelledby="blog-title">
+      <h2 id="blog-title">Blog</h2>
+
+      <article class="post-card">
+        <header class="post-head">
+          <h3>
+            <a href="blogs/concurrency-bug.html">
+              This Concurrency Bug Stayed Hidden for a Year
+            </a>
+          </h3>
+          <time datetime="2026-03-03">Apr 15, 2026</time>
+        </header>
+        <p>
+          A deep dive into a subtle concurrency bug that evaded detection for
+          over a year, exploring the root cause, debugging process, and
+          lessons learned for building more robust systems.
         </p>
-      </section>
+        <ul class="tags" aria-label="Post tags">
+          <li>Concurrency</li>
+          <li>Multi-threading</li>
+          <li>C#</li>
+          <li>Performance</li>
+        </ul>
+      </article>
 
-      <!-- Blog list: title, summary, date, and tags -->
-      <section id="blog" class="section" aria-labelledby="blog-title">
-        <h2 id="blog-title">Blog</h2>
-
-        <article class="post-card">
-          <header class="post-head">
-            <h3>
-              <a href="blogs/concurrency-bug.html">
-                This Concurrency Bug Stayed Hidden for a Year
-              </a>
-            </h3>
-            <time datetime="2026-03-03">Apr 15, 2026</time>
-          </header>
-          <p>
-            A deep dive into a subtle concurrency bug that evaded detection for
-            over a year, exploring the root cause, debugging process, and
-            lessons learned for building more robust systems.
-          </p>
-          <ul class="tags" aria-label="Post tags">
-            <li>Concurrency</li>
-            <li>Multi-threading</li>
-            <li>C#</li>
-            <li>Performance</li>
-          </ul>
-        </article>
-
-        <!-- <article class="post-card">
+      <!-- <article class="post-card">
           <header class="post-head">
             <h3>
               <a href="blogs/sse-vs-websocket.html">
@@ -79,7 +80,7 @@
           </ul>
         </article> -->
 
-        <!-- <article class="post-card">
+      <!-- <article class="post-card">
           <header class="post-head">
             <h3>
               <a href="blogs/benchmarking-lessons.html">
@@ -99,38 +100,77 @@
             <li>Reliability</li>
           </ul>
         </article> -->
-      </section>
+    </section>
 
-      <!-- About section kept intentionally short (2-3 lines) -->
-      <section id="about" class="section" aria-labelledby="about-title">
-        <h2 id="about-title">About</h2>
+    <section id="projects" class="section" aria-labelledby="projects-title">
+      <h2 id="projects-title">Projects</h2>
+
+      <article class="post-card">
+        <header class="post-head">
+          <h3>
+            <a href="projects/react-agent.html">
+              ReAct Agent Framework
+            </a>
+          </h3>
+          <time datetime="2026-04-20">Apr 20, 2026</time>
+        </header>
+
         <p>
-          I work on backend systems where API design, auth boundaries, and
-          runtime behavior directly affect reliability. Most writing here is
-          about practical tradeoffs in production systems.
+          Production-style ReAct agent framework with pluggable tool registry,
+          Gemini/Ollama provider abstraction, SSE-based reasoning trace streaming,
+          and JWT-based ABAC authorization for tool-level access control.
         </p>
-      </section>
-    </main>
+        <p class="project-links">
+          <a href="https://github.com/harshitsinghal13/react-agent-framework" target="_blank"
+            rel="noopener noreferrer">GitHub repository</a>
+        </p>
 
-    <!-- Minimal contact links with lightweight inline SVG icons -->
-    <footer id="contact" class="site-footer">
-      <div class="wrap footer-row">
-        <a class="contact-link" href="https://github.com/harshitsinghal13" aria-label="GitHub">
-          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.61-3.37-1.19-3.37-1.19-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.93 0-1.09.4-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.4 9.4 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.83-2.33 4.67-4.56 4.92.36.31.68.91.68 1.84v2.72c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
-          </svg>
-        </a>
-        <a class="contact-link" href="https://www.linkedin.com/in/harshit-singhal-a84b57150" aria-label="LinkedIn">
-          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <path d="M6.94 8.5a1.56 1.56 0 1 1 0-3.12 1.56 1.56 0 0 1 0 3.12ZM5.6 9.8h2.68V18H5.6V9.8Zm4.37 0h2.57v1.12h.04c.36-.68 1.23-1.39 2.53-1.39 2.7 0 3.2 1.77 3.2 4.08V18h-2.68v-3.9c0-.93-.02-2.13-1.3-2.13-1.3 0-1.5 1.02-1.5 2.06V18H9.97V9.8Z" />
-          </svg>
-        </a>
-        <!-- <a class="contact-link" href="mailto:your.email@example.com" aria-label="Email">
+        <ul class="tags" aria-label="Project tags">
+          <li>LLM</li>
+          <li>ReAct</li>
+          <li>FastAPI</li>
+          <li>SSE</li>
+          <li>JWT</li>
+          <li>ABAC</li>
+          <li>Agents</li>
+        </ul>
+      </article>
+
+    </section>
+
+    <!-- About section kept intentionally short (2-3 lines) -->
+    <section id="about" class="section" aria-labelledby="about-title">
+      <h2 id="about-title">About</h2>
+      <p>
+        I work on backend systems where API design, auth boundaries, and
+        runtime behavior directly affect reliability. Most writing here is
+        about practical tradeoffs in production systems.
+      </p>
+    </section>
+  </main>
+
+  <!-- Minimal contact links with lightweight inline SVG icons -->
+  <footer id="contact" class="site-footer">
+    <div class="wrap footer-row">
+      <a class="contact-link" href="https://github.com/harshitsinghal13" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <path
+            d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.61-3.37-1.19-3.37-1.19-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.55-1.11-4.55-4.93 0-1.09.4-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.4 9.4 0 0 1 5 0c1.9-1.29 2.74-1.02 2.74-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.83-2.33 4.67-4.56 4.92.36.31.68.91.68 1.84v2.72c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+        </svg>
+      </a>
+      <a class="contact-link" href="https://www.linkedin.com/in/harshit-singhal-a84b57150" aria-label="LinkedIn">
+        <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <path
+            d="M6.94 8.5a1.56 1.56 0 1 1 0-3.12 1.56 1.56 0 0 1 0 3.12ZM5.6 9.8h2.68V18H5.6V9.8Zm4.37 0h2.57v1.12h.04c.36-.68 1.23-1.39 2.53-1.39 2.7 0 3.2 1.77 3.2 4.08V18h-2.68v-3.9c0-.93-.02-2.13-1.3-2.13-1.3 0-1.5 1.02-1.5 2.06V18H9.97V9.8Z" />
+        </svg>
+      </a>
+      <!-- <a class="contact-link" href="mailto:your.email@example.com" aria-label="Email">
           <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
             <path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm0 2v.5l9 5.5 9-5.5V7l-9 5.5L3 7Z" />
           </svg>
         </a> -->
-      </div>
-    </footer>
-  </body>
+    </div>
+  </footer>
+</body>
+
 </html>

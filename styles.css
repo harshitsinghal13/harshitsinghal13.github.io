@@ -150,6 +150,21 @@ h2 {
   color: var(--muted);
 }
 
+.post-card p.project-links {
+  margin-top: 10px;
+}
+
+.project-links a {
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.project-links a:hover {
+  text-decoration: underline;
+}
+
 /* Tag pills */
 .tags {
   list-style: none;
